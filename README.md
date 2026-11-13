@@ -86,6 +86,10 @@ Block Talks check 05:30 UTC (11:00 IST), Block Talks sheet 06:00 UTC (11:30 IST)
 sheet 07:00 UTC (12:30 IST). Actions can start late. Run one job by hand from the Actions tab
 (`workflow_dispatch`). The workflow also runs the unit tests on pull requests.
 
+The schedules stay off until the repository variable `RUN_ON_GITHUB` is set to `true`
+(Settings → Secrets and variables → Actions → Variables). Set it only after the secrets below
+are added and the Mac's launchd jobs are unloaded, so GitHub and the Mac never run the same job.
+
 Add these repository secrets (Actions → Secrets). None of them belong in git:
 
 | Secret | Used for |

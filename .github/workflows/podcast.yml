@@ -1,7 +1,10 @@
 # Same check.sh and daily.sh the Mac runs from launchd.
 # Schedules are UTC. 11:00 IST is 05:30 UTC. GitHub may start a schedule late.
-# Nothing here publishes until the secrets below are set. Until then the job
-# fails the site login and exits non-zero, which is the alert.
+# The scheduled jobs are off by default, because the Mac already runs them:
+# they run only when the repository variable RUN_ON_GITHUB is "true"
+# (Settings > Secrets and variables > Actions > Variables). Set it only after
+# the secrets below are in place and the Mac's launchd jobs are unloaded,
+# so the two never publish side by side. Tests and manual runs always work.
 name: Podcast distribution
 
 on:
@@ -48,7 +51,7 @@ jobs:
   ai-check:
     if: >
       (github.event_name == 'workflow_dispatch' && (inputs.job == 'ai-check' || inputs.job == 'all'))
-      || (github.event_name == 'schedule' && github.event.schedule == '15 * * * *')
+      || (github.event_name == 'schedule' && vars.RUN_ON_GITHUB == 'true' && github.event.schedule == '15 * * * *')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -86,7 +89,7 @@ jobs:
   block-talks-check:
     if: >
       (github.event_name == 'workflow_dispatch' && (inputs.job == 'block-talks-check' || inputs.job == 'all'))
-      || (github.event_name == 'schedule' && github.event.schedule == '30 5 * * *')
+      || (github.event_name == 'schedule' && vars.RUN_ON_GITHUB == 'true' && github.event.schedule == '30 5 * * *')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -123,7 +126,7 @@ jobs:
   ai-daily:
     if: >
       (github.event_name == 'workflow_dispatch' && (inputs.job == 'ai-daily' || inputs.job == 'all'))
-      || (github.event_name == 'schedule' && github.event.schedule == '0 7 * * *')
+      || (github.event_name == 'schedule' && vars.RUN_ON_GITHUB == 'true' && github.event.schedule == '0 7 * * *')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -158,7 +161,7 @@ jobs:
   block-talks-daily:
     if: >
       (github.event_name == 'workflow_dispatch' && (inputs.job == 'block-talks-daily' || inputs.job == 'all'))
-      || (github.event_name == 'schedule' && github.event.schedule == '0 6 * * *')
+      || (github.event_name == 'schedule' && vars.RUN_ON_GITHUB == 'true' && github.event.schedule == '0 6 * * *')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
