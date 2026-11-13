@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.blockopedia.podcast-check</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/zsh</string>
+    <string>/Users/YOUR_USER/Claude/blockopedia-podcast/check.sh</string>
+  </array>
+  <!-- Once a day at 11:00. If the Mac is asleep then, it runs when the Mac wakes;
+       if the Mac is off all day, the next day's check picks up the missed videos. -->
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key>
+    <integer>11</integer>
+    <key>Minute</key>
+    <integer>0</integer>
+  </dict>
+  <key>RunAtLoad</key>
+  <false/>
+  <key>LowPriorityIO</key>
+  <true/>
+  <key>Nice</key>
+  <integer>10</integer>
+  <key>StandardOutPath</key>
+  <string>/Users/YOUR_USER/Claude/blockopedia-podcast/logs/launchd.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/YOUR_USER/Claude/blockopedia-podcast/logs/launchd.log</string>
+</dict>
+</plist>

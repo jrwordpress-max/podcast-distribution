@@ -1,0 +1,12 @@
+# Private or machine-specific files; never commit them.
+.wp.env
+*.env.local
+work/
+logs/
+backups/
+seen.txt
+fails.txt
+skip.txt
+.lock/
+__pycache__/
+.DS_Store
