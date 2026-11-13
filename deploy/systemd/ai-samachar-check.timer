@@ -1,0 +1,10 @@
+[Unit]
+Description=AI Samachar podcast check (hourly)
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+Unit=ai-samachar-check.service
+
+[Install]
+WantedBy=timers.target

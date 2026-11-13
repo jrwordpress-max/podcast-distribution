@@ -1,0 +1,11 @@
+[Unit]
+Description=Block Talks tracker sheet
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/podcast-distribution/blockopedia-podcast
+ExecStart=/bin/zsh /opt/podcast-distribution/blockopedia-podcast/daily.sh
+EnvironmentFile=-/opt/podcast-distribution/secrets.env
+Nice=10

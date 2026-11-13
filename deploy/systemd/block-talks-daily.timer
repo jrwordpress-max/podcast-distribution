@@ -1,0 +1,10 @@
+[Unit]
+Description=Block Talks tracker sheet (11:30 server local time)
+
+[Timer]
+OnCalendar=*-*-* 11:30:00
+Persistent=true
+Unit=block-talks-daily.service
+
+[Install]
+WantedBy=timers.target

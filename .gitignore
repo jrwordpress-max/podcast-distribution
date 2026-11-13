@@ -1,5 +1,6 @@
 # Private or machine-specific files; never commit them.
 .wp.env
+secrets.env
 *.env.local
 work/
 logs/
