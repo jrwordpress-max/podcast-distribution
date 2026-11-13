@@ -30,9 +30,12 @@ theblockopedia.com. AI Samachar never uses it; leave its redirect on.
 | `daily.sh` + `com.rankkking.ai-samachar-sheet.plist` | Daily at 12:30: `metrics.py` (plays, OP3), `episode_links.py` (Episode links tab), `platforms.py` (Platforms checks, Episode matrix) into the tracker sheet. Log: `logs/metrics.log`. |
 | `site/podcast-play-log.php` | Copy of the site snippet (mu-plugin) that records which app each play comes from. |
 
-Show notes are written by Claude (`claude -p` with `prompt.md`). If the Claude login on this Mac has
-expired, `check.sh` still publishes the episode, with show notes built straight from the YouTube
-description (`python3 publish.py autospec <video id>`), and a notification asks for `claude auth login`.
+Show notes are written by Claude (`claude -p` with `prompt.md`). Put a long-lived token in
+`secrets.env` as `CLAUDE_CODE_OAUTH_TOKEN` (from `claude setup-token`) or set `ANTHROPIC_API_KEY`.
+If neither works, `check.sh` still publishes the episode, with show notes built from the YouTube
+description, and a notification says the login needs refreshing. A failed check exits non-zero;
+the summary is the last lines of `logs/check.log`. See the repo README for the server, GitHub
+Actions, and the full secret list. `CATCH_UP=1` publishes a backlog in one run (up to `CATCH_UP_MAX`).
 
 On the site, `wp-content/mu-plugins/podcast-m4a-mime.php` (copy in `site/`) makes WordPress label .m4a
 audio as `audio/x-m4a`, and `wp-content/uploads/.htaccess` serves it as `audio/mp4`. Without them the

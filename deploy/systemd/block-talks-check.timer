@@ -1,0 +1,10 @@
+[Unit]
+Description=Block Talks podcast check (11:00 server local time)
+
+[Timer]
+OnCalendar=*-*-* 11:00:00
+Persistent=true
+Unit=block-talks-check.service
+
+[Install]
+WantedBy=timers.target

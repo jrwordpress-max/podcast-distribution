@@ -2,24 +2,15 @@
 # Daily sheet update, run by launchd at 11:30 after the 11:00 episode check:
 # play numbers, then episode links, then the platform checks and the Episode matrix.
 # A step that fails (the website or an app timing out) is tried again up to 2 more
-# times, 5 minutes apart, before a notification says it was not updated.
+# times, 5 minutes apart. One failed source inside metrics.py does not skip the
+# rest of that script. The job exits non-zero when a step still failed, and the
+# last lines of logs/metrics.log name which step.
 DIR=${0:A:h}
 cd "$DIR" || exit 1
-export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
-exec >>logs/metrics.log 2>&1
+source "$DIR/../shared/joblib.zsh"
+podcast_load_env
+export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
+mkdir -p logs
+podcast_log_to logs/metrics.log
 echo "== $(date '+%F %T')"
-
-notify() { osascript -e "display notification \"$2\" with title \"$1\"" >/dev/null 2>&1; }
-
-run() {  # run <what, for the notification> <script>
-  for try in 1 2 3; do
-    python3 "$2" && return 0
-    if (( try < 3 )); then echo "$2 failed (try $try of 3), trying again in 5 minutes"; sleep 300; fi
-  done
-  notify "Block Talks podcast" "$1 were not updated. See logs/metrics.log"
-  return 1
-}
-
-run "Daily numbers" metrics.py
-run "Episode links" episode_links.py
-run "Platform checks" platforms.py
+podcast_run_daily "Block Talks podcast"

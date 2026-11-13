@@ -1,0 +1,11 @@
+[Unit]
+Description=AI Samachar tracker sheet
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/podcast-distribution/ai-samachar-podcast
+ExecStart=/bin/zsh /opt/podcast-distribution/ai-samachar-podcast/daily.sh
+EnvironmentFile=-/opt/podcast-distribution/secrets.env
+Nice=10

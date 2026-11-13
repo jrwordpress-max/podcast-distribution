@@ -1,0 +1,191 @@
+# Same check.sh and daily.sh the Mac runs from launchd.
+# Schedules are UTC. 11:00 IST is 05:30 UTC. GitHub may start a schedule late.
+# Nothing here publishes until the secrets below are set. Until then the job
+# fails the site login and exits non-zero, which is the alert.
+name: Podcast distribution
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      job:
+        description: Which job to run
+        type: choice
+        required: true
+        default: all
+        options:
+          - ai-check
+          - block-talks-check
+          - ai-daily
+          - block-talks-daily
+          - all
+  schedule:
+    - cron: "15 * * * *"
+    - cron: "30 5 * * *"
+    - cron: "0 6 * * *"
+    - cron: "0 7 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Unit tests
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y zsh
+          python3 -m unittest discover -s tests -v
+
+  ai-check:
+    if: >
+      (github.event_name == 'workflow_dispatch' && (inputs.job == 'ai-check' || inputs.job == 'all'))
+      || (github.event_name == 'schedule' && github.event.schedule == '15 * * * *')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ai-samachar-podcast/seen.txt
+            ai-samachar-podcast/fails.txt
+            ai-samachar-podcast/skip.txt
+            ai-samachar-podcast/work/episode_links.json
+          key: ai-samachar-state-${{ github.run_id }}
+          restore-keys: |
+            ai-samachar-state-
+      - name: Install tools
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          COMPOSIO_API_KEY: ${{ secrets.COMPOSIO_API_KEY }}
+        run: bash deploy/ci-setup.sh check
+      - name: Publish new episodes
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ANTHROPIC_MODEL: ${{ vars.ANTHROPIC_MODEL }}
+          WP_API_USERNAME: ${{ secrets.AI_SAMACHAR_WP_USER }}
+          WP_API_PASSWORD: ${{ secrets.AI_SAMACHAR_WP_PASSWORD }}
+          SHEET_ID: ${{ secrets.AI_SAMACHAR_SHEET_ID }}
+          MODE: ${{ vars.PODCAST_MODE }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          NOTIFY_HOOK: ${{ secrets.NOTIFY_HOOK }}
+        run: bash deploy/run-job.sh ai-samachar-podcast check.sh
+
+  block-talks-check:
+    if: >
+      (github.event_name == 'workflow_dispatch' && (inputs.job == 'block-talks-check' || inputs.job == 'all'))
+      || (github.event_name == 'schedule' && github.event.schedule == '30 5 * * *')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/cache@v4
+        with:
+          path: |
+            blockopedia-podcast/seen.txt
+            blockopedia-podcast/fails.txt
+            blockopedia-podcast/skip.txt
+            blockopedia-podcast/work/episode_links.json
+          key: block-talks-state-${{ github.run_id }}
+          restore-keys: |
+            block-talks-state-
+      - name: Install tools
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: bash deploy/ci-setup.sh check
+      - name: Publish new episodes
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ANTHROPIC_MODEL: ${{ vars.ANTHROPIC_MODEL }}
+          WP_API_USERNAME: ${{ secrets.BLOCK_TALKS_WP_USER }}
+          WP_API_PASSWORD: ${{ secrets.BLOCK_TALKS_WP_PASSWORD }}
+          SHEET_ID: ${{ secrets.BLOCK_TALKS_SHEET_ID }}
+          MODE: ${{ vars.PODCAST_MODE }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          NOTIFY_HOOK: ${{ secrets.NOTIFY_HOOK }}
+        run: bash deploy/run-job.sh blockopedia-podcast check.sh
+
+  ai-daily:
+    if: >
+      (github.event_name == 'workflow_dispatch' && (inputs.job == 'ai-daily' || inputs.job == 'all'))
+      || (github.event_name == 'schedule' && github.event.schedule == '0 7 * * *')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ai-samachar-podcast/work/episode_links.json
+          key: ai-samachar-links-${{ github.run_id }}
+          restore-keys: |
+            ai-samachar-links-
+      - name: Install tools
+        env:
+          COMPOSIO_API_KEY: ${{ secrets.COMPOSIO_API_KEY }}
+          COMPOSIO_ORG_ID: ${{ secrets.COMPOSIO_ORG_ID }}
+          COMPOSIO_PROJECT_ID: ${{ secrets.COMPOSIO_PROJECT_ID }}
+        run: bash deploy/ci-setup.sh daily
+      - name: Update the tracker sheet
+        env:
+          COMPOSIO_API_KEY: ${{ secrets.COMPOSIO_API_KEY }}
+          WP_API_USERNAME: ${{ secrets.AI_SAMACHAR_WP_USER }}
+          WP_API_PASSWORD: ${{ secrets.AI_SAMACHAR_WP_PASSWORD }}
+          SHEET_ID: ${{ secrets.AI_SAMACHAR_SHEET_ID }}
+          PI_API_KEY: ${{ secrets.PI_API_KEY }}
+          PI_API_SECRET: ${{ secrets.PI_API_SECRET }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          NOTIFY_HOOK: ${{ secrets.NOTIFY_HOOK }}
+        run: bash deploy/run-job.sh ai-samachar-podcast daily.sh
+
+  block-talks-daily:
+    if: >
+      (github.event_name == 'workflow_dispatch' && (inputs.job == 'block-talks-daily' || inputs.job == 'all'))
+      || (github.event_name == 'schedule' && github.event.schedule == '0 6 * * *')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/cache@v4
+        with:
+          path: |
+            blockopedia-podcast/work/episode_links.json
+          key: block-talks-links-${{ github.run_id }}
+          restore-keys: |
+            block-talks-links-
+      - name: Install tools
+        env:
+          COMPOSIO_API_KEY: ${{ secrets.COMPOSIO_API_KEY }}
+          COMPOSIO_ORG_ID: ${{ secrets.COMPOSIO_ORG_ID }}
+          COMPOSIO_PROJECT_ID: ${{ secrets.COMPOSIO_PROJECT_ID }}
+        run: bash deploy/ci-setup.sh daily
+      - name: Update the tracker sheet
+        env:
+          COMPOSIO_API_KEY: ${{ secrets.COMPOSIO_API_KEY }}
+          WP_API_USERNAME: ${{ secrets.BLOCK_TALKS_WP_USER }}
+          WP_API_PASSWORD: ${{ secrets.BLOCK_TALKS_WP_PASSWORD }}
+          SHEET_ID: ${{ secrets.BLOCK_TALKS_SHEET_ID }}
+          PI_API_KEY: ${{ secrets.PI_API_KEY }}
+          PI_API_SECRET: ${{ secrets.PI_API_SECRET }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          NOTIFY_HOOK: ${{ secrets.NOTIFY_HOOK }}
+        run: bash deploy/run-job.sh blockopedia-podcast daily.sh

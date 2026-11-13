@@ -16,15 +16,16 @@ import datetime
 import html
 import json
 import os
-import subprocess
 import sys
-import time
 import urllib.error
 import urllib.request
 
 DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, DIR)
+sys.path.insert(0, os.path.join(os.path.dirname(DIR), "shared"))
 from publish import CFG, php  # noqa: E402  (shares config and the Novamira helper)
+from podcastlib.composio_client import composio as _composio  # noqa: E402
+from podcastlib.sources import call_with_retries  # noqa: E402
 
 SHEET_ID = CFG["SHEET_ID"]
 PODCAST_GUID = "319f1aba-352b-572d-8e80-29f49bc77788"  # the AI Samachar feed's podcast:guid
@@ -85,30 +86,16 @@ def op3_downloads():
 # ---------- Google Sheet (Composio CLI) ----------
 
 def composio(slug, args):
-    path = os.path.join(DIR, "work", f".cmp_{os.getpid()}.json")
-    json.dump(args, open(path, "w"))
-    try:
-        for attempt in range(5):
-            out = subprocess.run(["composio", "execute", slug, "-d", "@" + path], capture_output=True, text=True, timeout=120).stdout
-            res = json.loads(out[out.find("{"):])
-            # Google allows only so many sheet reads and writes a minute; wait and try again.
-            if res.get("successful") or "Quota exceeded" not in json.dumps(res):
-                break
-            time.sleep(30 + 15 * attempt)
-    finally:
-        os.remove(path)
-    if not res.get("successful"):
-        raise RuntimeError(f"{slug} failed: {json.dumps(res)[:400]}")
-    if res.get("storedInFile"):  # large reads are saved to a file instead of returned inline
-        return json.load(open(res["outputFilePath"])).get("data", {})
-    return res["data"]
+    """Sheet call. Empty or non-JSON Composio output is retried, then raised."""
+    os.makedirs(os.path.join(DIR, "work"), exist_ok=True)
+    return _composio(slug, args, work_dir=os.path.join(DIR, "work"))
 
 
 def write_sheet(site, op3):
     plat = {r["platform"]: {k: int(r[k] or 0) for k in ("plays", "plays7", "listeners")} for r in site["platforms"]}
     tracked = sum(p["plays"] for p in plat.values())
     since = (site.get("tracked_since") or TODAY)[:10]
-    top_ep = max(site["episodes"], key=lambda e: e["plays"])
+    top_ep = max(site["episodes"], key=lambda e: e["plays"]) if site.get("episodes") else {"plays": 0, "title": "—"}
     top_app = max(plat.items(), key=lambda kv: kv[1]["plays"]) if plat else ("—", {"plays": 0})
 
     # Plays by platform: biggest first.
@@ -127,7 +114,8 @@ def write_sheet(site, op3):
     prev = row - 1
     delta = lambda c: f"={c}{row}-{c}{prev}" if prev > 1 else ""
     named = set(DAILY_APPS) | set(WEBSITE)
-    daily = [TODAY, site["total"], delta("B"), site["unique"], site["last7"], op3, delta("F")]
+    op3_cell = "" if op3 is None else op3
+    daily = [TODAY, site["total"], delta("B"), site["unique"], site["last7"], op3_cell, delta("F")]
     daily += [plat.get(a, {}).get("plays", 0) for a in DAILY_APPS]
     daily += [sum(plat.get(w, {}).get("plays", 0) for w in WEBSITE), sum(p["plays"] for n, p in plat.items() if n not in named)]
     daily_header = ["Date", "Total plays", "New plays since last day", "Unique listeners", "Plays last 7 days", "OP3 downloads",
@@ -154,15 +142,37 @@ def write_sheet(site, op3):
             [f"Plays counted by app (since {since})", tracked, "Full split in the Plays by platform tab"],
             ["Top platform", top_app[1]["plays"], top_app[0]],
             ["Most played episode", top_ep["plays"], html.unescape(top_ep["title"])],
-            ["OP3 independent downloads", op3, "IAB-style count from op3.dev"],
+            ["OP3 independent downloads", op3_cell, "IAB-style count from op3.dev" if op3 is not None else "Unavailable this run; the other numbers were still written"],
             ["", "", ""], ["", "", ""], ["", "", ""], ["", "", ""], ["", "", ""]]},
     ]})
     return row
 
 
-if __name__ == "__main__":
-    site, op3 = site_stats(), op3_downloads()
+def main(argv=None):
+    argv = sys.argv if argv is None else argv
+    try:
+        site = call_with_retries(site_stats)
+    except Exception as exc:
+        print("ERROR: site stats failed: %s" % exc)
+        return 1
+    op3 = None
+    try:
+        op3 = call_with_retries(op3_downloads)
+    except Exception as exc:
+        # OP3 is an extra count. The sheet still updates from the site.
+        print("WARN: OP3 downloads failed: %s" % exc)
     print(json.dumps({"date": TODAY, "plays": site["total"], "unique": site["unique"], "last7": site["last7"],
                       "op3": op3, "by_platform": {r["platform"]: int(r["plays"]) for r in site["platforms"]}}))
-    if "--dry-run" not in sys.argv:
-        print("wrote Daily metrics row", write_sheet(site, op3))
+    if "--dry-run" not in argv:
+        try:
+            print("wrote Daily metrics row", write_sheet(site, op3))
+        except Exception as exc:
+            print("ERROR: sheet update failed: %s" % exc)
+            return 1
+    if op3 is None:
+        print("WARN: completed with OP3 unavailable")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

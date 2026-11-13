@@ -1,0 +1,10 @@
+[Unit]
+Description=AI Samachar tracker sheet (12:30 server local time)
+
+[Timer]
+OnCalendar=*-*-* 12:30:00
+Persistent=true
+Unit=ai-samachar-daily.service
+
+[Install]
+WantedBy=timers.target

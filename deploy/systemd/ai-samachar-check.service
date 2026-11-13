@@ -1,0 +1,11 @@
+[Unit]
+Description=AI Samachar podcast check
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/podcast-distribution/ai-samachar-podcast
+ExecStart=/bin/zsh /opt/podcast-distribution/ai-samachar-podcast/check.sh
+EnvironmentFile=-/opt/podcast-distribution/secrets.env
+Nice=10

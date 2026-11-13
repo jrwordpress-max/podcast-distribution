@@ -15,7 +15,7 @@ To see which videos are waiting, without publishing anything: `./check.sh --list
 
 | File | What it does |
 | --- | --- |
-| `config.env` | Settings. `MODE=draft` saves new episodes as drafts; `MODE=publish` puts them live. The channel rules (`CHANNEL_MATCH`, `MIN_MINUTES`, `CHANNEL_SINCE`) are here too. |
+| `config.env` | Settings. `MODE=publish` (the default) puts new episodes live; `MODE=draft` saves them as drafts. `CATCH_UP=1` drains a backlog in one run, up to `CATCH_UP_MAX`. The channel rules (`CHANNEL_MATCH`, `MIN_MINUTES`, `CHANNEL_SINCE`) are here too. |
 | `check.sh` | The daily check. Run it by hand any time: `./check.sh`; `./check.sh --list` only lists what is waiting |
 | `publish.py` | Downloads one video's audio and creates its episode. |
 | `daily.sh` | The 11:30 sheet update: runs `metrics.py`, `episode_links.py` and `platforms.py` in that order. A step that fails is tried again up to 2 more times, 5 minutes apart. Run it by hand any time: `./daily.sh` |
@@ -47,9 +47,20 @@ launchctl unload ~/Library/LaunchAgents/com.blockopedia.podcast-check.plist
 
 The daily sheet job is `com.blockopedia.podcast-metrics.plist` (it runs `daily.sh`); turn it on or off the same way. Its log is `logs/metrics.log`.
 
+Show notes are written by Claude (`claude -p` with `prompt.md`). Put a long-lived token in
+`secrets.env` as `CLAUDE_CODE_OAUTH_TOKEN` (from `claude setup-token`) or set `ANTHROPIC_API_KEY`.
+If neither works, the episode still publishes, with show notes built from the YouTube description.
+The Mac's `novamira` login is unchanged. A server or GitHub Actions run sets `WP_API_USERNAME`
+and `WP_API_PASSWORD` instead. See the repo README for that setup and the full secret list.
+
+New episodes are numbered by YouTube upload date. Numbers already on the site are left as they are.
+A failed check or sheet update exits non-zero. The summary is the last lines of `logs/check.log`
+or `logs/metrics.log`.
+
 ## When something goes wrong
 
 - A notification says "will retry" or "gave up": read the last lines of `logs/check.log`.
 - A notification says the numbers, episode links or platform checks "were not updated": all 3 tries failed; read the last lines of `logs/metrics.log`, then run `./daily.sh` by hand.
+- A notification says "Claude login needed": the episode was still published, with simpler show notes. Run `claude setup-token` and put the token in `secrets.env`.
 - A draft looks wrong: fix it in wp-admin › Podcast before publishing.
-- The Mac was off: nothing is lost; the next check picks up every video it missed.
+- The Mac was off: nothing is lost; the next check picks up every video it missed, oldest upload first.
